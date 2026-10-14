@@ -26,7 +26,11 @@ export default tseslint.config(
   },
   {
     files: ["scripts/**/*.ts", "tests/**/*.ts"],
-    rules: { "no-console": "off" },
+    rules: {
+      "no-console": "off",
+      // 接口测试用 typeof import() 标注动态加载的路由模块类型，这里放行
+      "@typescript-eslint/consistent-type-imports": "off",
+    },
   },
   prettier,
 );
