@@ -58,6 +58,16 @@ docs/
 
 分层约定：**repository 只写 SQL，service 只编排业务，route handler 只做协议转换**。上层可以调用下层，禁止反向依赖。
 
+## 环境要求
+
+| 依赖 | 版本 | 说明 |
+| --- | --- | --- |
+| Node.js | >= 20.10 | 用到 `node:crypto` 的 scrypt 与 Next 15 的能力 |
+| npm | >= 10 | 随 Node 一起安装即可 |
+| 磁盘 | 约 300 MB | 含 node_modules |
+
+不需要数据库服务或任何外部 API Key，数据写在本地 SQLite 文件里。
+
 ## 快速开始
 
 ```bash
@@ -68,6 +78,13 @@ npm run db:migrate   # 建表
 npm run db:seed      # 写入演示数据（含默认管理员账号）
 
 npm run dev          # http://localhost:3000
+```
+
+启动后访问 http://localhost:3000 ，未登录会自动跳到 /login，用下面的演示账号登录即可。
+本地验证一条命令跑完：
+
+```bash
+npm run verify       # 类型检查 + lint + 敏感信息自查 + 66 个测试
 ```
 
 种子数据创建的默认账号：
@@ -156,6 +173,21 @@ docker run -p 3000:3000 -v teamdesk-data:/app/data teamdesk
 - 仓库不含任何真实密钥；`.env.example` 只提供占位值
 - `.gitignore` 已排除数据库文件、环境变量与日志
 - 提交前可运行 `npm run check:secrets` 做一遍粗筛
+
+## 参与开发
+
+提交前请先读 [CONTRIBUTING.md](./CONTRIBUTING.md)：分支命名、Conventional Commits
+提交格式、分层约定与质量要求都写在里面。日常改动的最小闭环是：
+
+```bash
+git checkout -b feat/<简述>
+# 改动 + 补测试
+npm run verify
+git commit -m "feat(scope): 一句话说明"
+```
+
+提交信息里的 `scope` 使用模块名：`db` / `api` / `web` / `auth` / `domain` / `stats`。
+PR 模板里附了自查清单，照着勾完再发。
 
 ## 进一步阅读
 
