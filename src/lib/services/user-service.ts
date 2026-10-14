@@ -53,6 +53,21 @@ export class UserService {
     return user;
   }
 
+  /**
+   * 修改密码：必须先验证旧密码，防止会话被盗后直接改密。
+   * 新旧密码相同不做额外限制，但会重新生成盐，哈希值必然变化。
+   */
+  changePassword(userId: string, currentPassword: string, newPassword: string): void {
+    const user = this.users.findById(userId);
+    if (!user) {
+      throw AppError.notFound("用户");
+    }
+    if (!verifyPassword(currentPassword, user.passwordHash)) {
+      throw AppError.badRequest("当前密码不正确");
+    }
+    this.users.updatePasswordHash(userId, hashPassword(newPassword));
+  }
+
   toPublic(user: UserRecord | null): PublicUser | null {
     if (!user) return null;
     const { passwordHash: _passwordHash, ...safe } = user;

@@ -85,6 +85,11 @@ export const ticketImportSchema = z.object({
 
 export type TicketImportPayload = z.infer<typeof ticketImportSchema>;
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "请输入当前密码").max(72),
+  newPassword: z.string().min(8, "新密码至少 8 位").max(72),
+});
+
 export const registerSchema = z.object({
   email: z.string().trim().email("邮箱格式不正确").max(120),
   name: z.string().trim().min(1, "姓名不能为空").max(40),

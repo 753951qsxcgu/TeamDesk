@@ -67,4 +67,8 @@ export class UserRepository {
     const row = this.db.prepare("SELECT COUNT(*) AS total FROM users").get() as { total: number };
     return row.total;
   }
+
+  updatePasswordHash(id: string, passwordHash: string): void {
+    this.db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(passwordHash, id);
+  }
 }
