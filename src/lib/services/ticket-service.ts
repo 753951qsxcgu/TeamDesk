@@ -6,21 +6,33 @@ import { AppError } from "@/lib/domain/errors";
 import { assertTransition, timestampsForTransition } from "@/lib/domain/ticket-status";
 import type {
   Paginated,
+  PublicUser,
   TicketDetail,
   TicketQuery,
   TicketRecord,
+  UserRole,
 } from "@/lib/domain/types";
 import type { CreateCommentPayload, CreateTicketPayload, UpdateTicketPayload, TransitionPayload } from "@/lib/domain/validation";
 import type { CommentRepository, CommentWithAuthor } from "@/lib/repositories/comment-repository";
 import type { TagRepository } from "@/lib/repositories/tag-repository";
 import type { TicketRepository } from "@/lib/repositories/ticket-repository";
-import type { UserRepository } from "@/lib/repositories/user-repository";
+
+/** 只需要「按 id 查用户」的能力，repository 与 service 都能满足 */
+export interface UserLookup {
+  findById(id: string): PublicUser | null;
+}
+
+/** 操作者身份：接口层从会话里取出来传进来，service 不感知 Cookie */
+export interface Actor {
+  id: string;
+  role: UserRole;
+}
 
 export interface TicketServiceDeps {
   tickets: TicketRepository;
   comments: CommentRepository;
   tags: TagRepository;
-  users: UserRepository;
+  users: UserLookup;
 }
 
 export class TicketService {
@@ -34,8 +46,8 @@ export class TicketService {
     return this.deps.tickets.findDetail(this.requireTicket(id).id) ?? this.raiseNotFound();
   }
 
-  create(payload: CreateTicketPayload): TicketDetail {
-    this.assertUserExists(payload.reporterId, "报告人");
+  create(payload: CreateTicketPayload, reporterId: string): TicketDetail {
+    this.assertUserExists(reporterId, "报告人");
     if (payload.assigneeId) {
       this.assertUserExists(payload.assigneeId, "经办人");
     }
@@ -44,7 +56,7 @@ export class TicketService {
       title: payload.title,
       description: payload.description,
       priority: payload.priority,
-      reporterId: payload.reporterId,
+      reporterId,
       assigneeId: payload.assigneeId ?? null,
     });
 
@@ -54,8 +66,9 @@ export class TicketService {
     return this.get(ticket.id);
   }
 
-  update(id: string, payload: UpdateTicketPayload): TicketDetail {
-    this.requireTicket(id);
+  update(id: string, payload: UpdateTicketPayload, actor: Actor): TicketDetail {
+    const ticket = this.requireTicket(id);
+    this.assertCanEdit(ticket, actor);
     if (payload.assigneeId) {
       this.assertUserExists(payload.assigneeId, "经办人");
     }
@@ -92,8 +105,11 @@ export class TicketService {
     return this.get(id);
   }
 
-  remove(id: string): { id: string } {
+  remove(id: string, actor: Actor): { id: string } {
     this.requireTicket(id);
+    if (actor.role !== "admin") {
+      throw AppError.forbidden("只有管理员可以删除工单");
+    }
     this.deps.tickets.delete(id);
     return { id };
   }
@@ -103,35 +119,31 @@ export class TicketService {
     return this.deps.comments.listByTicket(ticketId);
   }
 
-  addComment(ticketId: string, payload: CreateCommentPayload): CommentWithAuthor {
+  addComment(ticketId: string, payload: CreateCommentPayload, authorId: string): CommentWithAuthor {
     this.requireTicket(ticketId);
-    this.assertUserExists(payload.authorId, "评论作者");
+    this.assertUserExists(authorId, "评论作者");
 
     const comment = this.deps.comments.create({
       ticketId,
-      authorId: payload.authorId,
+      authorId,
       body: payload.body,
     });
-    const author = this.deps.users.findById(payload.authorId);
+    const author = this.deps.users.findById(authorId);
 
-    return {
-      ...comment,
-      author: author
-        ? {
-            id: author.id,
-            email: author.email,
-            name: author.name,
-            role: author.role,
-            createdAt: author.createdAt,
-          }
-        : null,
-    };
+    return { ...comment, author };
   }
 
   private requireTicket(id: string): TicketRecord {
     const ticket = this.deps.tickets.findById(id);
     if (!ticket) throw AppError.notFound("工单");
     return ticket;
+  }
+
+  /** 管理员放行；其余情况只有报告人或经办人能改 */
+  private assertCanEdit(ticket: TicketRecord, actor: Actor): void {
+    if (actor.role === "admin") return;
+    if (ticket.reporterId === actor.id || ticket.assigneeId === actor.id) return;
+    throw AppError.forbidden("只有报告人、经办人或管理员可以修改该工单");
   }
 
   private assertUserExists(id: string, label: string): void {

@@ -13,8 +13,8 @@ export const createTicketSchema = z.object({
   description: z.string().trim().max(5000, "描述不能超过 5000 个字").default(""),
   priority: z.enum(TICKET_PRIORITIES).default("medium"),
   assigneeId: optionalId,
-  // 鉴权接入前由调用方显式传入，接入后改为从会话填充（见 M5）
-  reporterId: z.string().min(1).max(64),
+  // 鉴权接入后由接口层用会话身份覆盖，这里保留是为了兼容早期的显式传参
+  reporterId: z.string().min(1).max(64).optional(),
   tagIds: z.array(z.string().min(1).max(64)).max(10, "最多 10 个标签").optional(),
 });
 
@@ -41,7 +41,8 @@ export type TransitionPayload = z.infer<typeof transitionSchema>;
 
 export const createCommentSchema = z.object({
   body: z.string().trim().min(1, "评论内容不能为空").max(2000, "评论不能超过 2000 个字"),
-  authorId: z.string().min(1).max(64),
+  // 同 reporterId：接入鉴权后由会话身份决定
+  authorId: z.string().min(1).max(64).optional(),
 });
 
 export type CreateCommentPayload = z.infer<typeof createCommentSchema>;
