@@ -5,7 +5,6 @@
  *
  * 说明：只做正则层面的粗筛，目的是拦住误提交，不能替代人工复核。
  */
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -24,14 +23,7 @@ const RULES: Rule[] = [
   { name: "硬编码口令赋值", pattern: /(password|passwd|secret|token)\s*[:=]\s*["'][^"'\s]{8,}["']/i },
 ];
 
-const SKIP_PATHS = [
-  "node_modules/",
-  ".next/",
-  ".git/",
-  "package-lock.json",
-  "data/",
-  "coverage/",
-];
+const SKIP_DIRECTORIES = new Set(["node_modules", ".next", ".git", "data", "coverage", ".workbuddy"]);
 
 const ALLOWLIST_FILES = [
   // 占位配置与规则自身的样例
@@ -40,18 +32,31 @@ const ALLOWLIST_FILES = [
   "docs/",
 ];
 
-function listTrackedFiles(): string[] {
-  const output = execFileSync("git", ["ls-files"], { encoding: "utf8" });
-  return output
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+/**
+ * 直接遍历工作目录，不依赖 git 子进程：
+ * 环境里 spawn 可能受限，且在 CI 上也能对未提交文件生效。
+ */
+function collectFiles(root: string): string[] {
+  const results: string[] = [];
+
+  const walk = (directory: string): void => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (SKIP_DIRECTORIES.has(entry.name)) continue;
+        walk(path.join(directory, entry.name));
+        continue;
+      }
+      results.push(path.relative(root, path.join(directory, entry.name)).replace(/\\/g, "/"));
+    }
+  };
+
+  walk(root);
+  return results;
 }
 
 function main(): void {
-  const files = listTrackedFiles().filter(
-    (file) => !SKIP_PATHS.some((skip) => file.startsWith(skip)),
-  );
+  const root = process.cwd();
+  const files = collectFiles(root).filter((file) => file !== "package-lock.json");
 
   const findings: { file: string; line: number; rule: string; snippet: string }[] = [];
 
@@ -60,7 +65,7 @@ function main(): void {
 
     let content: string;
     try {
-      content = fs.readFileSync(path.resolve(file), "utf8");
+      content = fs.readFileSync(path.resolve(root, file), "utf8");
     } catch {
       continue;
     }
