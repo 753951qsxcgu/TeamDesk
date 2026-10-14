@@ -4,17 +4,24 @@ import Link from "next/link";
 import { useState } from "react";
 import { TicketBulkBar } from "@/components/tickets/ticket-bulk-bar";
 import { PriorityBadge, StatusBadge } from "@/components/tickets/badges";
+import { SlaBadge } from "@/components/tickets/sla-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { PublicUser, TicketDetail } from "@/lib/domain/types";
+import type { SlaState } from "@/lib/domain/sla";
 import { formatRelative } from "@/lib/web/format";
 
 export interface TicketTableProps {
   tickets: TicketDetail[];
   /** 批量指派时可选的经办人 */
   users: PublicUser[];
+  /**
+   * SLA 由服务端算好再传进来：表格是客户端组件，
+   * 在客户端用 Date.now() 重算会和 SSR 结果不一致，导致 hydration 不匹配。
+   */
+  slaById: Record<string, SlaState>;
 }
 
-export function TicketTable({ tickets, users }: TicketTableProps) {
+export function TicketTable({ tickets, users, slaById }: TicketTableProps) {
   const [selected, setSelected] = useState<string[]>([]);
 
   if (tickets.length === 0) {
@@ -54,6 +61,7 @@ export function TicketTable({ tickets, users }: TicketTableProps) {
               <th className="px-3 py-2 font-medium">经办人</th>
               <th className="px-3 py-2 font-medium">标签</th>
               <th className="px-3 py-2 font-medium">评论</th>
+              <th className="px-3 py-2 font-medium">SLA</th>
               <th className="px-5 py-2 font-medium">更新</th>
             </tr>
           </thead>
@@ -107,6 +115,14 @@ export function TicketTable({ tickets, users }: TicketTableProps) {
                   </div>
                 </td>
                 <td className="px-3 py-3 text-slate-500">{ticket.commentCount}</td>
+                <td className="px-3 py-3">
+                  {slaById[ticket.id] ? (
+                    <SlaBadge
+                      state={slaById[ticket.id]!}
+                      settled={Boolean(ticket.resolvedAt ?? ticket.closedAt)}
+                    />
+                  ) : null}
+                </td>
                 <td className="px-5 py-3 text-slate-500">{formatRelative(ticket.updatedAt)}</td>
               </tr>
             ))}

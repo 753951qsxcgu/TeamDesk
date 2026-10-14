@@ -4,8 +4,10 @@ import { ActivityTimeline } from "@/components/tickets/activity-timeline";
 import { CommentPanel } from "@/components/tickets/comment-panel";
 import { PriorityBadge, StatusBadge } from "@/components/tickets/badges";
 import { TicketActions } from "@/components/tickets/ticket-actions";
+import { SlaBadge } from "@/components/tickets/sla-badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { AppError } from "@/lib/domain/errors";
+import { evaluateSla } from "@/lib/domain/sla";
 import { allowedNextStatuses } from "@/lib/domain/ticket-status";
 import { getServices } from "@/lib/services/container";
 import { formatDateTime, formatRelative } from "@/lib/web/format";
@@ -35,6 +37,13 @@ export default async function TicketDetailPage({ params }: PageProps) {
   }
 
   const nextStatuses = allowedNextStatuses(ticket.status);
+  const sla = evaluateSla({
+    createdAt: ticket.createdAt,
+    priority: ticket.priority,
+    resolvedAt: ticket.resolvedAt,
+    closedAt: ticket.closedAt,
+  });
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -92,6 +101,13 @@ export default async function TicketDetailPage({ params }: PageProps) {
                     </span>
                   ))
                 )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-500">响应时限</dt>
+              <dd className="mt-0.5 flex items-center gap-2 text-slate-800">
+                <SlaBadge state={sla} settled={Boolean(ticket.resolvedAt ?? ticket.closedAt)} />
+                <span className="text-xs text-slate-500">{formatDateTime(sla.dueAt)}</span>
               </dd>
             </div>
             <div>

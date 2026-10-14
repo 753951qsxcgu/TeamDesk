@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Pagination } from "@/components/ui/pagination";
 import { TICKET_PRIORITIES, TICKET_STATUSES } from "@/lib/domain/types";
 import type { TicketPriority, TicketQuery, TicketStatus } from "@/lib/domain/types";
+import { evaluateSla } from "@/lib/domain/sla";
 import { getServices } from "@/lib/services/container";
 import { buildQuery } from "@/lib/web/query";
 
@@ -62,6 +63,18 @@ export default async function TicketsPage({ searchParams }: PageProps) {
   const users = services.users.list();
   const tags = services.tags.list();
 
+  const slaById = Object.fromEntries(
+    result.items.map((ticket) => [
+      ticket.id,
+      evaluateSla({
+        createdAt: ticket.createdAt,
+        priority: ticket.priority,
+        resolvedAt: ticket.resolvedAt,
+        closedAt: ticket.closedAt,
+      }),
+    ]),
+  );
+
   // 导出走同一个筛选条件，用户看到什么就导出什么
   const exportHref = `/api/tickets/export${buildQuery({
     keyword,
@@ -106,7 +119,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
             </div>
           }
         />
-        <TicketTable tickets={result.items} users={users} />
+        <TicketTable tickets={result.items} users={users} slaById={slaById} />
         <Pagination
           page={result.page}
           pageSize={result.pageSize}
