@@ -43,24 +43,27 @@ export class StatsService {
     };
   }
 
-  /** 从今天倒推 N 天的零点 ISO 串 */
+  /**
+   * 趋势窗口统一按 UTC 计算：created_at 存的是 ISO 串，
+   * SQL 里 substr(created_at, 1, 10) 取的也是 UTC 日期，两边口径必须一致。
+   */
   private startOfTrend(days: number): string {
     const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    start.setDate(start.getDate() - (days - 1));
+    start.setUTCHours(0, 0, 0, 0);
+    start.setUTCDate(start.getUTCDate() - (days - 1));
     return start.toISOString();
   }
 
   private fillTrend(days: number, counts: Map<string, number>): TrendPoint[] {
     const points: TrendPoint[] = [];
     const cursor = new Date();
-    cursor.setHours(0, 0, 0, 0);
-    cursor.setDate(cursor.getDate() - (days - 1));
+    cursor.setUTCHours(0, 0, 0, 0);
+    cursor.setUTCDate(cursor.getUTCDate() - (days - 1));
 
     for (let index = 0; index < days; index += 1) {
       const day = cursor.toISOString().slice(0, 10);
       points.push({ day, total: counts.get(day) ?? 0 });
-      cursor.setDate(cursor.getDate() + 1);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
     return points;
   }
