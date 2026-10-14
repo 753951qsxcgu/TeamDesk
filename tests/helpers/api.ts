@@ -14,6 +14,7 @@ export interface ApiHarness {
     detail: typeof import("@/app/api/tickets/[id]/route");
     transition: typeof import("@/app/api/tickets/[id]/transition/route");
     comments: typeof import("@/app/api/tickets/[id]/comments/route");
+    exportCsv: typeof import("@/app/api/tickets/export/route");
     tags: typeof import("@/app/api/tags/route");
   };
 }
@@ -47,6 +48,7 @@ export async function setupApi(): Promise<ApiHarness> {
       detail: await import("@/app/api/tickets/[id]/route"),
       transition: await import("@/app/api/tickets/[id]/transition/route"),
       comments: await import("@/app/api/tickets/[id]/comments/route"),
+      exportCsv: await import("@/app/api/tickets/export/route"),
       tags: await import("@/app/api/tags/route"),
     },
   };

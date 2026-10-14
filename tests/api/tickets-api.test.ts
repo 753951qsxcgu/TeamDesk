@@ -288,6 +288,45 @@ describe("登录态与权限", () => {
   });
 });
 
+describe("GET /api/tickets/export", () => {
+  it("返回带 BOM 的 CSV 附件，并带上当前筛选条件", async () => {
+    await createTicket("待导出的工单", { description: "导出用" });
+
+    const response = await harness.routes.exportCsv.GET(
+      new NextRequest(`${BASE}/tickets/export?status=open`),
+    );
+    // Response.text() 会自动剥掉 BOM，所以直接看字节
+    const bytes = Buffer.from(await response.arrayBuffer());
+    const text = bytes.toString("utf-8");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/csv");
+    expect(response.headers.get("content-disposition")).toContain("attachment;");
+    expect(bytes.subarray(0, 3).toString("hex")).toBe("efbbbf");
+    expect(text).toContain("待导出的工单");
+    // 表头用的是中文标签，方便直接给运营看
+    expect(text.split("\r\n")[0]).toContain("标题,状态,优先级");
+  });
+
+  it("筛选条件非法时返回 400，不产出文件", async () => {
+    const response = await harness.routes.exportCsv.GET(
+      new NextRequest(`${BASE}/tickets/export?status=not-a-status`),
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("未登录导出返回 401", async () => {
+    authState.currentUser = null;
+
+    const response = await harness.routes.exportCsv.GET(
+      new NextRequest(`${BASE}/tickets/export`),
+    );
+
+    expect(response.status).toBe(401);
+  });
+});
+
 describe("GET /api/tags", () => {
   it("返回标签列表", async () => {
     const response = await harness.routes.tags.GET();
