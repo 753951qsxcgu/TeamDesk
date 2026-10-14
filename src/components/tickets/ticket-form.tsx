@@ -18,8 +18,6 @@ export interface TicketFormValues {
 export interface TicketFormProps {
   users: PublicUser[];
   tags: TagRecord[];
-  /** 演示阶段的报告人身份，M5 接入会话后从登录态取 */
-  reporterId: string;
   /** 传入则为编辑模式 */
   ticketId?: string;
   initialValues?: Partial<TicketFormValues>;
@@ -28,7 +26,7 @@ export interface TicketFormProps {
 const INPUT_CLASS =
   "w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500";
 
-export function TicketForm({ users, tags, reporterId, ticketId, initialValues }: TicketFormProps) {
+export function TicketForm({ users, tags, ticketId, initialValues }: TicketFormProps) {
   const router = useRouter();
   const [values, setValues] = useState<TicketFormValues>({
     title: initialValues?.title ?? "",
@@ -57,18 +55,17 @@ export function TicketForm({ users, tags, reporterId, ticketId, initialValues }:
     setSubmitting(true);
     setError(null);
     try {
+      // 报告人与评论作者由服务端从会话里取，不在这里传
       const payload = {
         title: values.title,
         description: values.description,
         priority: values.priority,
         assigneeId: values.assigneeId === "" ? null : values.assigneeId,
         tagIds: values.tagIds,
-        reporterId,
       };
 
       if (ticketId) {
-        const { reporterId: _reporterId, ...patch } = payload;
-        await apiSend(`/api/tickets/${ticketId}`, "PATCH", patch);
+        await apiSend(`/api/tickets/${ticketId}`, "PATCH", payload);
         router.push(`/tickets/${ticketId}`);
       } else {
         const created = await apiSend<{ id: string }>("/api/tickets", "POST", payload);

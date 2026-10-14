@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { handle } from "@/lib/api/response";
 import { parseOrThrow, readJsonBody, searchParamsToObject } from "@/lib/api/validate";
+import { requireUser } from "@/lib/auth/current-user";
 import { createTicketSchema, ticketListQuerySchema } from "@/lib/domain/validation";
 import { getServices } from "@/lib/services/container";
 
@@ -9,7 +10,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  return handle(() => {
+  return handle(async () => {
+    await requireUser();
     const query = parseOrThrow(
       ticketListQuerySchema,
       searchParamsToObject(request.nextUrl.searchParams),
@@ -24,7 +26,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   return handle(async () => {
+    const user = await requireUser();
     const payload = parseOrThrow(createTicketSchema, await readJsonBody(request));
-    return getServices().tickets.create(payload);
+    // 报告人一律取会话身份，不信任请求体里的 reporterId
+    return getServices().tickets.create(payload, user.id);
   });
 }

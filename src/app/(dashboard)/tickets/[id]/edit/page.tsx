@@ -33,7 +33,6 @@ export default async function EditTicketPage({ params }: PageProps) {
           <TicketForm
             users={services.users.list()}
             tags={services.tags.list()}
-            reporterId={ticket.reporterId}
             ticketId={ticket.id}
             initialValues={{
               title: ticket.title,

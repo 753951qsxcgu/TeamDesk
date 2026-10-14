@@ -26,7 +26,7 @@ export default async function NewTicketPage() {
       <Card>
         <CardHeader title="新建工单" description="创建后默认进入「待处理」状态" />
         <CardContent>
-          <TicketForm users={users} tags={tags} reporterId={users[0]!.id} />
+          <TicketForm users={users} tags={tags} />
         </CardContent>
       </Card>
     </div>

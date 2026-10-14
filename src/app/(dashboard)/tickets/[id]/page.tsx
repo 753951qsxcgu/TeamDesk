@@ -31,9 +31,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
     throw error;
   }
 
-  const users = services.users.list();
   const nextStatuses = allowedNextStatuses(ticket.status);
-
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -116,12 +114,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
       <Card>
         <CardHeader title={`评论（${comments.length}）`} />
         <CardContent>
-          <CommentPanel
-            ticketId={ticket.id}
-            comments={comments}
-            users={users}
-            defaultAuthorId={ticket.assignee?.id ?? ticket.reporter?.id ?? users[0]?.id ?? ""}
-          />
+          <CommentPanel ticketId={ticket.id} comments={comments} />
         </CardContent>
       </Card>
     </div>
