@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toCsv } from "@/lib/web/csv";
+import { parseCsv, toCsv } from "@/lib/web/csv";
 
 /** toCsv 会带 BOM，断言正文时先剥掉，单独用一条用例覆盖 BOM */
 function body(csv: string): string {
@@ -34,5 +34,59 @@ describe("toCsv", () => {
 
   it("没有数据行时只输出表头", () => {
     expect(body(toCsv(["标题"], []))).toBe("标题");
+  });
+
+  it("导出再解析能原样还原，转义不会丢字符", () => {
+    const rows = [
+      ["登录失败", "登录页, 输入正确密码仍报错"],
+      ['导出含 "引号" 的标题', "换行\n第二行"],
+    ];
+    const parsed = parseCsv(toCsv(["标题", "描述"], rows));
+
+    expect(parsed[0]).toEqual(["标题", "描述"]);
+    expect(parsed.slice(1)).toEqual(rows);
+  });
+});
+
+describe("parseCsv", () => {
+  it("按行拆分，兼容 CRLF 与 LF", () => {
+    expect(parseCsv("a,b\r\n1,2")).toEqual([
+      ["a", "b"],
+      ["1", "2"],
+    ]);
+    expect(parseCsv("a,b\n1,2")).toEqual([
+      ["a", "b"],
+      ["1", "2"],
+    ]);
+  });
+
+  it("引号内的逗号与换行不算分隔符", () => {
+    expect(parseCsv('a,"1,2"\r\n"line1\nline2",b')).toEqual([
+      ["a", "1,2"],
+      ["line1\nline2", "b"],
+    ]);
+  });
+
+  it("两个连续引号还原成一个引号", () => {
+    expect(parseCsv('"say ""hi"""')).toEqual([['say "hi"']]);
+  });
+
+  it("剥掉 BOM 后再解析，表头不会多出不可见字符", () => {
+    expect(parseCsv("﻿标题,状态\r\n登录,open")).toEqual([
+      ["标题", "状态"],
+      ["登录", "open"],
+    ]);
+  });
+
+  it("文件不以换行结尾时最后一行仍然有效", () => {
+    expect(parseCsv("a,b\r\n1,2")).toHaveLength(2);
+  });
+
+  it("末尾的空行不产生空记录", () => {
+    expect(parseCsv("a,b\r\n1,2\r\n")).toHaveLength(2);
+  });
+
+  it("空单元格保留为空字符串", () => {
+    expect(parseCsv("a,,c")).toEqual([["a", "", "c"]]);
   });
 });
