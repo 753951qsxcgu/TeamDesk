@@ -5,6 +5,7 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { getCurrentUser } from "@/lib/auth/current-user";
 
 const NAV_ITEMS = [
+  { href: "/dashboard", label: "工作台" },
   { href: "/tickets", label: "工单列表" },
   { href: "/board", label: "看板" },
   { href: "/stats", label: "统计" },
