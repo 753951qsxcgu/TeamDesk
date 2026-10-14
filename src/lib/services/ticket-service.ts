@@ -11,6 +11,8 @@ import type {
   TicketQuery,
   TicketRecord,
   TicketActivityWithActor,
+  TicketPriority,
+  TicketStatus,
   UserRole,
 } from "@/lib/domain/types";
 import type { CreateCommentPayload, CreateTicketPayload, UpdateTicketPayload, TransitionPayload } from "@/lib/domain/validation";
@@ -22,6 +24,17 @@ import type { TicketRepository } from "@/lib/repositories/ticket-repository";
 /** 只需要「按 id 查用户」的能力，repository 与 service 都能满足 */
 export interface UserLookup {
   findById(id: string): PublicUser | null;
+}
+
+export interface BulkUpdatePatch {
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  assigneeId?: string | null;
+}
+
+export interface BulkUpdateResult {
+  updated: number;
+  skipped: { id: string; reason: string }[];
 }
 
 /** 操作者身份：接口层从会话里取出来传进来，service 不感知 Cookie */
@@ -160,6 +173,72 @@ export class TicketService {
     });
 
     return { ...comment, author };
+  }
+
+  /**
+   * 批量更新：逐条校验，单条失败不影响其余，返回成功条数与跳过原因。
+   * 批量接口刻意不做「要么全成功要么全回滚」，运营场景下部分成功更有用。
+   */
+  bulkUpdate(ids: string[], patch: BulkUpdatePatch, actor: Actor): BulkUpdateResult {
+    const result: BulkUpdateResult = { updated: 0, skipped: [] };
+
+    for (const id of ids) {
+      const ticket = this.deps.tickets.findById(id);
+      if (!ticket) {
+        result.skipped.push({ id, reason: "工单不存在" });
+        continue;
+      }
+      try {
+        this.assertCanEdit(ticket, actor);
+        if (patch.status) {
+          assertTransition(ticket.status, patch.status);
+        }
+        if (patch.assigneeId) {
+          this.assertUserExists(patch.assigneeId, "经办人");
+        }
+      } catch (error) {
+        result.skipped.push({ id, reason: error instanceof AppError ? error.message : "不允许的操作" });
+        continue;
+      }
+
+      const now = new Date().toISOString();
+      this.deps.tickets.update(id, {
+        ...patch,
+        ...(patch.status ? timestampsForTransition(ticket.status, patch.status, now) : {}),
+      });
+
+      if (patch.status && patch.status !== ticket.status) {
+        this.deps.activities.create({
+          ticketId: id,
+          actorId: actor.id,
+          type: "status_changed",
+          fromValue: ticket.status,
+          toValue: patch.status,
+        });
+      }
+      if (patch.priority && patch.priority !== ticket.priority) {
+        this.deps.activities.create({
+          ticketId: id,
+          actorId: actor.id,
+          type: "priority_changed",
+          fromValue: ticket.priority,
+          toValue: patch.priority,
+        });
+      }
+      if (patch.assigneeId !== undefined && patch.assigneeId !== ticket.assigneeId) {
+        this.deps.activities.create({
+          ticketId: id,
+          actorId: actor.id,
+          type: "assignee_changed",
+          fromValue: ticket.assigneeId ?? "未指派",
+          toValue: patch.assigneeId ?? "未指派",
+        });
+      }
+
+      result.updated += 1;
+    }
+
+    return result;
   }
 
   listActivities(ticketId: string, limit = 50): TicketActivityWithActor[] {

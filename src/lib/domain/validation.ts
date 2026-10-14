@@ -63,6 +63,19 @@ export const ticketListQuerySchema = z.object({
 
 export type TicketListQueryPayload = z.infer<typeof ticketListQuerySchema>;
 
+export const bulkUpdateSchema = z
+  .object({
+    ids: z.array(z.string().min(1).max(64)).min(1, "至少选择一条工单").max(50, "一次最多 50 条"),
+    status: z.enum(TICKET_STATUSES).optional(),
+    priority: z.enum(TICKET_PRIORITIES).optional(),
+    assigneeId: z.string().max(64).nullable().optional(),
+  })
+  .refine((value) => value.status || value.priority || value.assigneeId !== undefined, {
+    message: "没有需要更新的字段",
+  });
+
+export type BulkUpdatePayload = z.infer<typeof bulkUpdateSchema>;
+
 export const registerSchema = z.object({
   email: z.string().trim().email("邮箱格式不正确").max(120),
   name: z.string().trim().min(1, "姓名不能为空").max(40),
