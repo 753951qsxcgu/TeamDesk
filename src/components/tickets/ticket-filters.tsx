@@ -14,6 +14,9 @@ export interface TicketFiltersProps {
     priority?: string;
     assigneeId?: string;
     tagId?: string;
+    sort?: string;
+    order?: string;
+    pageSize?: string;
   };
   users: PublicUser[];
   tags: TagRecord[];
@@ -86,6 +89,32 @@ export function TicketFilters({ defaultValues, users, tags }: TicketFiltersProps
               {tag.name}
             </option>
           ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1 text-xs text-slate-500">
+        排序
+        <select name="sort" defaultValue={defaultValues.sort ?? "updated_at"} className={SELECT_CLASS}>
+          <option value="updated_at">按更新时间</option>
+          <option value="created_at">按创建时间</option>
+          <option value="priority">按优先级</option>
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1 text-xs text-slate-500">
+        方向
+        <select name="order" defaultValue={defaultValues.order ?? "desc"} className={SELECT_CLASS}>
+          <option value="desc">从新到旧 / 从高到低</option>
+          <option value="asc">从旧到新 / 从低到高</option>
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1 text-xs text-slate-500">
+        每页
+        <select name="pageSize" defaultValue={defaultValues.pageSize ?? "20"} className={SELECT_CLASS}>
+          <option value="20">20 条</option>
+          <option value="50">50 条</option>
+          <option value="100">100 条</option>
         </select>
       </label>
 

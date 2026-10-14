@@ -37,6 +37,12 @@ export default async function TicketsPage({ searchParams }: PageProps) {
   const assigneeId = readParam(params, "assigneeId");
   const tagId = readParam(params, "tagId");
   const page = Number(readParam(params, "page") ?? "1");
+  const pageSizeRaw = Number(readParam(params, "pageSize") ?? "20");
+  // 排序字段与方向走白名单，非法值回落默认，避免直接透传给 SQL
+  const sortParam = readParam(params, "sort");
+  const sort: TicketQuery["sort"] =
+    sortParam === "created_at" || sortParam === "priority" ? sortParam : "updated_at";
+  const order: TicketQuery["order"] = readParam(params, "order") === "asc" ? "asc" : "desc";
 
   const query: TicketQuery = {
     keyword,
@@ -46,8 +52,9 @@ export default async function TicketsPage({ searchParams }: PageProps) {
     assigneeId: assigneeId === "none" ? null : assigneeId,
     tagId,
     page: Number.isFinite(page) && page > 0 ? page : 1,
-    sort: "updated_at",
-    order: "desc",
+    pageSize: [20, 50, 100].includes(pageSizeRaw) ? pageSizeRaw : 20,
+    sort,
+    order,
   };
 
   const result = services.tickets.list(query);
@@ -60,7 +67,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
         <CardHeader title="筛选工单" description="组合条件后点击筛选，条件会写进地址栏便于分享" />
         <CardContent>
           <TicketFilters
-            defaultValues={{ keyword, status, priority, assigneeId, tagId }}
+            defaultValues={{ keyword, status, priority, assigneeId, tagId, sort, order }}
             users={users}
             tags={tags}
           />
@@ -85,7 +92,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
           pageSize={result.pageSize}
           total={result.total}
           basePath="/tickets"
-          filters={{ keyword, status, priority, assigneeId, tagId }}
+          filters={{ keyword, status, priority, assigneeId, tagId, sort, order, pageSize: String(query.pageSize) }}
         />
       </Card>
     </div>
