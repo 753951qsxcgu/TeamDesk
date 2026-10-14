@@ -6,6 +6,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { TICKET_PRIORITIES, TICKET_STATUSES } from "@/lib/domain/types";
 import type { TicketPriority, TicketQuery, TicketStatus } from "@/lib/domain/types";
 import { getServices } from "@/lib/services/container";
+import { buildQuery } from "@/lib/web/query";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,17 @@ export default async function TicketsPage({ searchParams }: PageProps) {
   const users = services.users.list();
   const tags = services.tags.list();
 
+  // 导出走同一个筛选条件，用户看到什么就导出什么
+  const exportHref = `/api/tickets/export${buildQuery({
+    keyword,
+    status,
+    priority,
+    assigneeId,
+    tagId,
+    sort,
+    order,
+  })}`;
+
   return (
     <div className="space-y-5">
       <Card>
@@ -78,12 +90,20 @@ export default async function TicketsPage({ searchParams }: PageProps) {
         <CardHeader
           title={`工单列表（${result.total}）`}
           action={
-            <Link
-              href="/tickets/new"
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              新建
-            </Link>
+            <div className="flex items-center gap-2">
+              <a
+                href={exportHref}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                导出 CSV
+              </a>
+              <Link
+                href="/tickets/new"
+                className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                新建
+              </Link>
+            </div>
           }
         />
         <TicketTable tickets={result.items} users={users} />
