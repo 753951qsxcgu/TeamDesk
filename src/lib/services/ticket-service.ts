@@ -3,7 +3,8 @@
  * 状态机、存在性校验、关联维护都放在这里，接口层保持薄。
  */
 import { AppError } from "@/lib/domain/errors";
-import { assertTransition, timestampsForTransition } from "@/lib/domain/ticket-status";
+import { parseCsv } from "@/lib/csv";
+import { assertTransition, parsePriority, timestampsForTransition } from "@/lib/domain/ticket-status";
 import type {
   Paginated,
   PublicUser,
@@ -15,15 +16,16 @@ import type {
   TicketStatus,
   UserRole,
 } from "@/lib/domain/types";
-import type { CreateCommentPayload, CreateTicketPayload, UpdateTicketPayload, TransitionPayload } from "@/lib/domain/validation";
+import type { CreateCommentPayload, CreateTicketPayload, TicketImportPayload, UpdateTicketPayload, TransitionPayload } from "@/lib/domain/validation";
 import type { ActivityRepository } from "@/lib/repositories/activity-repository";
 import type { CommentRepository, CommentWithAuthor } from "@/lib/repositories/comment-repository";
 import type { TagRepository } from "@/lib/repositories/tag-repository";
 import type { TicketRepository } from "@/lib/repositories/ticket-repository";
 
-/** 只需要「按 id 查用户」的能力，repository 与 service 都能满足 */
+/** 只需要「按 id / email 查用户」的能力，repository 与 service 都能满足 */
 export interface UserLookup {
   findById(id: string): PublicUser | null;
+  findByEmail(email: string): PublicUser | null;
 }
 
 export interface BulkUpdatePatch {
@@ -36,6 +38,17 @@ export interface BulkUpdateResult {
   updated: number;
   skipped: { id: string; reason: string }[];
 }
+
+export interface TicketImportResult {
+  /** 解析出的有效数据行数 */
+  total: number;
+  created: number;
+  skipped: { row: number; title: string; reason: string }[];
+  ticketIds: string[];
+}
+
+/** 单次导入的行数上限，防止一个超大文件把请求拖死 */
+const IMPORT_ROW_LIMIT = 500;
 
 /** 操作者身份：接口层从会话里取出来传进来，service 不感知 Cookie */
 export interface Actor {
@@ -244,6 +257,110 @@ export class TicketService {
   listActivities(ticketId: string, limit = 50): TicketActivityWithActor[] {
     this.requireTicket(ticketId);
     return this.deps.activities.listByTicket(ticketId, limit);
+  }
+
+  /**
+   * 批量导入：与批量更新一样不追求「全成功或全回滚」，
+   * 逐行校验，能建的建，建不了的说明原因返回给用户自己改。
+   */
+  importTickets(payload: TicketImportPayload, actor: Actor): TicketImportResult {
+    const rows = parseCsv(payload.csv);
+    const header = rows[0];
+    if (!header || rows.length < 2) {
+      throw AppError.badRequest("CSV 至少需要表头与一行数据");
+    }
+
+    // 列位置按表头名查找，列顺序变了也不影响
+    const columns = header.map((cell) => cell.trim().toLowerCase());
+    const columnIndex = (...aliases: string[]): number => {
+      for (const alias of aliases) {
+        const index = columns.indexOf(alias.toLowerCase());
+        if (index >= 0) return index;
+      }
+      return -1;
+    };
+
+    const titleIndex = columnIndex("标题", "title");
+    if (titleIndex < 0) {
+      throw AppError.badRequest("CSV 缺少「标题」列");
+    }
+    const descriptionIndex = columnIndex("描述", "description");
+    const priorityIndex = columnIndex("优先级", "priority");
+    const assigneeIndex = columnIndex("经办人邮箱", "经办人", "assignee", "assignee_email");
+    const tagsIndex = columnIndex("标签", "tags", "tag");
+
+    const result: TicketImportResult = { total: 0, created: 0, skipped: [], ticketIds: [] };
+
+    for (const [offset, row] of rows.slice(1, IMPORT_ROW_LIMIT + 1).entries()) {
+      // 报给用户的行号从表头那一行开始算，方便对着文件改
+      const rowNumber = offset + 2;
+      const title = (row[titleIndex] ?? "").trim();
+
+      if (title === "") {
+        result.skipped.push({ row: rowNumber, title: "", reason: "标题为空" });
+        continue;
+      }
+      if (title.length > 120) {
+        result.skipped.push({ row: rowNumber, title, reason: "标题超过 120 个字" });
+        continue;
+      }
+      result.total += 1;
+
+      const description = descriptionIndex >= 0 ? (row[descriptionIndex] ?? "").trim() : "";
+      if (description.length > 5000) {
+        result.skipped.push({ row: rowNumber, title, reason: "描述超过 5000 个字" });
+        continue;
+      }
+
+      let priority: TicketPriority = "medium";
+      const rawPriority = priorityIndex >= 0 ? (row[priorityIndex] ?? "").trim() : "";
+      if (rawPriority !== "") {
+        const parsed = parsePriority(rawPriority);
+        if (!parsed) {
+          result.skipped.push({ row: rowNumber, title, reason: `优先级无法识别：${rawPriority}` });
+          continue;
+        }
+        priority = parsed;
+      }
+
+      let assigneeId: string | null = null;
+      const rawAssignee = assigneeIndex >= 0 ? (row[assigneeIndex] ?? "").trim() : "";
+      if (rawAssignee !== "") {
+        const assignee = this.deps.users.findByEmail(rawAssignee);
+        if (!assignee) {
+          result.skipped.push({ row: rowNumber, title, reason: `经办人邮箱不存在：${rawAssignee}` });
+          continue;
+        }
+        assigneeId = assignee.id;
+      }
+
+      const rawTags = tagsIndex >= 0 ? (row[tagsIndex] ?? "") : "";
+      const tagNames = rawTags
+        .split(/[/、,]/)
+        .map((name) => name.trim())
+        .filter((name) => name !== "");
+      if (tagNames.length > 10) {
+        result.skipped.push({ row: rowNumber, title, reason: "标签超过 10 个" });
+        continue;
+      }
+      // 试跑阶段不真的建标签，只认已有的
+      const tagIds = tagNames
+        .map((name) =>
+          payload.dryRun ? this.deps.tags.findByName(name)?.id : this.deps.tags.ensure(name).id,
+        )
+        .filter((id): id is string => Boolean(id));
+
+      if (payload.dryRun) continue;
+
+      const ticket = this.create(
+        { title, description, priority, assigneeId, tagIds },
+        actor.id,
+      );
+      result.created += 1;
+      result.ticketIds.push(ticket.id);
+    }
+
+    return result;
   }
 
   /** 记录优先级与经办人的变化；标题/描述这类改动只记一条 updated */

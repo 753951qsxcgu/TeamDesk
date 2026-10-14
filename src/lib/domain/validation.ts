@@ -76,6 +76,15 @@ export const bulkUpdateSchema = z
 
 export type BulkUpdatePayload = z.infer<typeof bulkUpdateSchema>;
 
+/** 导入直接收整段 CSV 文本，解析与列映射交给 service，接口层不做业务判断 */
+export const ticketImportSchema = z.object({
+  csv: z.string().min(1, "CSV 内容为空").max(2_000_000, "导入文件过大"),
+  // 试跑只校验不落库，先在页面上把问题行暴露出来
+  dryRun: z.boolean().default(false),
+});
+
+export type TicketImportPayload = z.infer<typeof ticketImportSchema>;
+
 export const registerSchema = z.object({
   email: z.string().trim().email("邮箱格式不正确").max(120),
   name: z.string().trim().min(1, "姓名不能为空").max(40),

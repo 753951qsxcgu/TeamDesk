@@ -327,6 +327,99 @@ describe("GET /api/tickets/export", () => {
   });
 });
 
+describe("POST /api/tickets/import", () => {
+  async function runImport(csv: string, dryRun = false) {
+    const response = await harness.routes.importCsv.POST(
+      jsonRequest(`${BASE}/tickets/import`, "POST", { csv, dryRun }),
+    );
+    return (await response.json()) as {
+      ok: boolean;
+      data?: {
+        total: number;
+        created: number;
+        ticketIds: string[];
+        skipped: { row: number; title: string; reason: string }[];
+      };
+      error?: { code: string; message: string };
+    };
+  }
+
+  it("按表头导入工单，识别中文优先级与邮箱指派", async () => {
+    const body = await runImport(
+      [
+        "标题,描述,优先级,经办人邮箱,标签",
+        `导入工单甲,第一行,紧急,${harness.member.email},登录/支付`,
+        '导入工单乙,"含,逗号的描述",低,,登录',
+      ].join("\r\n"),
+    );
+
+    expect(body.ok).toBe(true);
+    expect(body.data?.total).toBe(2);
+    expect(body.data?.created).toBe(2);
+    expect(body.data?.skipped).toEqual([]);
+
+    const detail = await harness.routes.detail.GET(
+      new NextRequest(`${BASE}/tickets/${body.data!.ticketIds[0]}`),
+      { params: Promise.resolve({ id: body.data!.ticketIds[0]! }) },
+    );
+    const detailBody = await detail.json();
+
+    expect(detailBody.data.priority).toBe("urgent");
+    expect(detailBody.data.assignee.id).toBe(harness.member.id);
+    // 标签统一按名称排序返回，断言前也排一次，避免依赖具体顺序
+    const tagNames = (detailBody.data.tags as { name: string }[]).map((tag) => tag.name).sort();
+    expect(tagNames).toEqual(["登录", "支付"].sort());
+  });
+
+  it("试跑只校验不落库", async () => {
+    const body = await runImport("标题\r\n试跑专用工单\r\n", true);
+
+    expect(body.data?.total).toBe(1);
+    expect(body.data?.created).toBe(0);
+    expect(body.data?.ticketIds).toEqual([]);
+
+    const listed = await harness.routes.list.GET(
+      new NextRequest(`${BASE}/tickets?keyword=${encodeURIComponent("试跑专用工单")}`),
+    );
+    const listedBody = await listed.json();
+    expect(listedBody.data.total).toBe(0);
+  });
+
+  it("问题行逐条给出行号与原因，其余照常导入", async () => {
+    const body = await runImport(
+      [
+        "标题,优先级,经办人邮箱",
+        "正常工单,高,",
+        ",中,",
+        "经办人缺失的工单,中,nobody@teamdesk.test",
+        "优先级非法的工单,超级急,",
+      ].join("\r\n"),
+    );
+
+    expect(body.data?.created).toBe(1);
+    expect(body.data?.skipped).toEqual([
+      { row: 3, title: "", reason: "标题为空" },
+      { row: 4, title: "经办人缺失的工单", reason: "经办人邮箱不存在：nobody@teamdesk.test" },
+      { row: 5, title: "优先级非法的工单", reason: "优先级无法识别：超级急" },
+    ]);
+  });
+
+  it("缺少标题列返回 400", async () => {
+    const body = await runImport("描述,优先级\r\n没有标题列,高\r\n");
+
+    expect(body.ok).toBe(false);
+    expect(body.error?.code).toBe("BAD_REQUEST");
+    expect(body.error?.message).toContain("标题");
+  });
+
+  it("未登录导入返回 401", async () => {
+    authState.currentUser = null;
+    const body = await runImport("标题\r\n未登录导入\r\n");
+
+    expect(body.error?.code).toBe("UNAUTHORIZED");
+  });
+});
+
 describe("GET /api/tags", () => {
   it("返回标签列表", async () => {
     const response = await harness.routes.tags.GET();

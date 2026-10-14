@@ -24,6 +24,11 @@ export class UserService {
     return this.toPublic(this.users.findById(id));
   }
 
+  /** 导入工单时按邮箱定位经办人，用不到密码哈希所以也返回公开形态 */
+  findByEmail(email: string): PublicUser | null {
+    return this.toPublic(this.users.findByEmail(email.trim().toLowerCase()));
+  }
+
   register(input: RegisterInput): PublicUser {
     const email = input.email.trim().toLowerCase();
     if (this.users.findByEmail(email)) {

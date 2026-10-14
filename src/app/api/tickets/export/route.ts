@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { STATUS_LABELS, PRIORITY_LABELS } from "@/lib/domain/ticket-status";
 import { ticketListQuerySchema } from "@/lib/domain/validation";
 import { getServices } from "@/lib/services/container";
-import { toCsv } from "@/lib/web/csv";
+import { toCsv } from "@/lib/csv";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

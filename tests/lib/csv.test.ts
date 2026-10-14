@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCsv, toCsv } from "@/lib/web/csv";
+import { parseCsv, toCsv } from "@/lib/csv";
 
 /** toCsv 会带 BOM，断言正文时先剥掉，单独用一条用例覆盖 BOM */
 function body(csv: string): string {

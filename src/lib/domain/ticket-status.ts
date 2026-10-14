@@ -71,3 +71,27 @@ export const PRIORITY_WEIGHT: Record<TicketPriority, number> = {
   high: 3,
   urgent: 4,
 };
+
+/**
+ * 导入 CSV 时要把用户填的文案还原成枚举值。
+ * 导出的文件里写的是中文标签，所以这里中文与英文都要认。
+ */
+function buildLookup<V extends string>(labels: Record<V, string>): Map<string, V> {
+  const lookup = new Map<string, V>();
+  for (const [value, label] of Object.entries(labels) as [V, string][]) {
+    lookup.set(value.toLowerCase(), value);
+    lookup.set(label.toLowerCase(), value);
+  }
+  return lookup;
+}
+
+const STATUS_LOOKUP = buildLookup(STATUS_LABELS);
+const PRIORITY_LOOKUP = buildLookup(PRIORITY_LABELS);
+
+export function parseStatus(value: string): TicketStatus | null {
+  return STATUS_LOOKUP.get(value.trim().toLowerCase()) ?? null;
+}
+
+export function parsePriority(value: string): TicketPriority | null {
+  return PRIORITY_LOOKUP.get(value.trim().toLowerCase()) ?? null;
+}
