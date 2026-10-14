@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/board", label: "看板" },
   { href: "/stats", label: "统计" },
   { href: "/tickets/new", label: "新建工单" },
+  { href: "/tickets/import", label: "批量导入" },
 ];
 
 /**
