@@ -73,6 +73,35 @@ export const MIGRATIONS: readonly Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_ticket_tags_tag ON ticket_tags(tag_id);
     `,
   },
+  {
+    version: 2,
+    name: "add_ticket_activities",
+    sql: `
+      CREATE TABLE IF NOT EXISTS ticket_activities (
+        id         TEXT PRIMARY KEY,
+        ticket_id  TEXT NOT NULL,
+        actor_id   TEXT,
+        type       TEXT NOT NULL,
+        from_value TEXT,
+        to_value   TEXT,
+        note       TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+        FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_activities_ticket ON ticket_activities(ticket_id, created_at);
+    `,
+  },
+  {
+    version: 3,
+    name: "add_ticket_list_indexes",
+    sql: `
+      -- 列表最常见的组合是「状态 + 更新时间倒序」，补一条复合索引
+      CREATE INDEX IF NOT EXISTS idx_tickets_status_updated ON tickets(status, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_tickets_reporter ON tickets(reporter_id);
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

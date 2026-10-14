@@ -73,6 +73,32 @@ export interface TicketQuery {
   order?: "asc" | "desc";
 }
 
+/** 工单上的一次可追溯动作，用于详情页的活动流 */
+export interface TicketActivity {
+  id: string;
+  ticketId: string;
+  actorId: string | null;
+  type: ActivityType;
+  fromValue: string | null;
+  toValue: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface TicketActivityWithActor extends TicketActivity {
+  actor: PublicUser | null;
+}
+
+export const ACTIVITY_TYPES = [
+  "created",
+  "status_changed",
+  "priority_changed",
+  "assignee_changed",
+  "commented",
+  "updated",
+] as const;
+export type ActivityType = (typeof ACTIVITY_TYPES)[number];
+
 export interface Paginated<T> {
   items: T[];
   total: number;

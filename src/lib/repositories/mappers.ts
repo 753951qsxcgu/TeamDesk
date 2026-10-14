@@ -3,8 +3,10 @@
  * 只有这里知道表里的 snake_case 列名，repository 之外一律使用 camelCase。
  */
 import type {
+  ActivityType,
   CommentRecord,
   TagRecord,
+  TicketActivity,
   TicketRecord,
   TicketPriority,
   TicketStatus,
@@ -82,6 +84,30 @@ export function mapComment(row: CommentRow): CommentRecord {
     ticketId: row.ticket_id,
     authorId: row.author_id,
     body: row.body,
+    createdAt: row.created_at,
+  };
+}
+
+export interface ActivityRow {
+  id: string;
+  ticket_id: string;
+  actor_id: string | null;
+  type: string;
+  from_value: string | null;
+  to_value: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export function mapActivity(row: ActivityRow): TicketActivity {
+  return {
+    id: row.id,
+    ticketId: row.ticket_id,
+    actorId: row.actor_id,
+    type: row.type as ActivityType,
+    fromValue: row.from_value,
+    toValue: row.to_value,
+    note: row.note,
     createdAt: row.created_at,
   };
 }
