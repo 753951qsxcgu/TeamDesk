@@ -40,6 +40,19 @@
 
 返回当前登录用户；未登录返回 `401`。
 
+### POST /api/auth/password
+
+```jsonc
+// 请求
+{ "currentPassword": "旧密码", "newPassword": "至少8位" }
+
+// 响应 200
+{ "ok": true, "data": { "id": "..." } }
+```
+
+只改当前会话用户的密码，不接受任何用户 id 参数。旧密码不正确返回
+`400 BAD_REQUEST`；新密码不足 8 位返回 `400 VALIDATION_ERROR`。
+
 ## 工单
 
 ### GET /api/tickets
@@ -110,6 +123,56 @@
 
 // 说明：作者取会话身份
 ```
+
+### GET /api/tickets/:id/activities
+
+按时间倒序返回该工单的操作记录（最多 50 条），含操作人。
+类型包括 `created` / `status_changed` / `priority_changed` /
+`assignee_changed` / `commented` / `updated`，状态与优先级变更会带上
+`fromValue` 与 `toValue`。
+
+### POST /api/tickets/bulk
+
+```jsonc
+// 请求
+{ "ids": ["...", "..."], "status": "in_progress", "priority": "high", "assigneeId": null }
+
+// 响应 200
+{ "ok": true, "data": { "updated": 2, "skipped": [{ "id": "...", "reason": "工单不存在" }] } }
+```
+
+一次最多 50 条，`status` / `priority` / `assigneeId` 至少填一项。
+逐条鉴权与状态机校验，**不做整体回滚**：能改的改掉，改不了的进 `skipped`
+并说明原因。`assigneeId: null` 表示取消指派。
+
+### GET /api/tickets/export
+
+沿用列表接口的全部筛选条件，最多导出 1000 条，返回带 UTF-8 BOM 的
+CSV 附件（`content-disposition: attachment`），表头为中文。
+筛选条件非法时返回 `400`，不产出文件。
+
+### POST /api/tickets/import
+
+```jsonc
+// 请求
+{ "csv": "标题,描述,优先级,经办人邮箱,标签\r\n登录报错,点击无响应,高,,登录\r\n", "dryRun": false }
+
+// 响应 200
+{
+  "ok": true,
+  "data": {
+    "total": 1,
+    "created": 1,
+    "ticketIds": ["..."],
+    "skipped": [{ "row": 3, "title": "", "reason": "标题为空" }]
+  }
+}
+```
+
+按表头名定位列（中英文都认，列顺序任意），表头必须包含「标题」。
+优先级可写中文标签或英文枚举值；经办人按邮箱匹配，不存在则该行跳过；
+标签用 `/` 分隔，不存在的自动创建。`dryRun: true` 时只校验不落库。
+单次最多处理 500 行，报告人一律是会话身份。
 
 ## 标签与统计
 

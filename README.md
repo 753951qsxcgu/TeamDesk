@@ -13,6 +13,12 @@
 - **统计看板**：状态与优先级分布、近 7 日新建趋势、平均解决时长、经办人负载
 - **用户与鉴权**：注册 / 登录 / 登出，密码使用 scrypt 加盐哈希，会话 Cookie 为 HttpOnly，接口按角色（admin / member）与资源归属鉴权
 - **检索**：关键词、状态、优先级、经办人、标签组合筛选，支持排序与服务端分页
+- **操作留痕**：状态、优先级、经办人的变化都写入活动流，详情页以时间线回放
+- **批量处理**：列表多选后批量改状态 / 优先级 / 经办人，逐条鉴权，跳过的原因逐条反馈
+- **导入导出**：列表按当前筛选导出 CSV；CSV 批量导入支持试跑校验，问题行按行号列出
+- **SLA 提醒**：按优先级承诺响应时限（紧急 4h / 高 8h / 中 24h / 低 72h），超时在列表与工作台高亮
+- **我的工作台**：登录后首屏给出超时未处理、指派给我的、我创建的四组待办
+- **个人设置**：查看账号信息并修改密码（需先验证旧密码）
 
 ## 技术栈
 
@@ -41,6 +47,7 @@ src/
     services/             # 业务编排层
     auth/                 # 密码哈希、会话令牌、登录态
     api/                  # 响应包装、错误翻译、入参校验
+    csv.ts                # CSV 生成与解析（导入导出共用）
     web/                  # 浏览器侧 API 封装与格式化
 tests/
   repositories/           # 数据层单测
@@ -84,7 +91,7 @@ npm run dev          # http://localhost:3000
 本地验证一条命令跑完：
 
 ```bash
-npm run verify       # 类型检查 + lint + 敏感信息自查 + 66 个测试
+npm run verify       # 类型检查 + lint + 敏感信息自查 + 98 个测试
 ```
 
 种子数据创建的默认账号：
@@ -104,7 +111,7 @@ npm run verify       # 类型检查 + lint + 敏感信息自查 + 66 个测试
 | `npm run build` / `npm start` | 生产构建与启动 |
 | `npm run typecheck` | TypeScript 全量类型检查 |
 | `npm run lint` | ESLint |
-| `npm test` | 运行全部测试（66 个用例） |
+| `npm test` | 运行全部测试（98 个用例） |
 | `npm run check:secrets` | 敏感信息自查 |
 | `npm run verify` | 类型检查 + lint + 自查 + 测试，提交前跑一遍 |
 | `npm run db:migrate` | 执行数据库迁移 |
@@ -116,11 +123,14 @@ npm run verify       # 类型检查 + lint + 敏感信息自查 + 66 个测试
 users        id, email, name, password_hash, role, created_at
 tickets      id, title, description, status, priority, assignee_id, reporter_id,
              created_at, updated_at, resolved_at, closed_at
-comments     id, ticket_id, author_id, body, created_at
-tags         id, name, color
-ticket_tags  ticket_id, tag_id
+comments          id, ticket_id, author_id, body, created_at
+tags              id, name, color
+ticket_tags       ticket_id, tag_id
+ticket_activities id, ticket_id, actor_id, type, from_value, to_value, note, created_at
 schema_migrations version, name, applied_at
 ```
+
+迁移以「版本 + SQL」数组维护，执行记录写在 `schema_migrations` 里，重复执行幂等。
 
 ## 接口
 
@@ -132,6 +142,7 @@ schema_migrations version, name, applied_at
 | POST | `/api/auth/login` | 登录，写入会话 Cookie |
 | POST | `/api/auth/logout` | 登出 |
 | GET | `/api/auth/me` | 当前用户 |
+| POST | `/api/auth/password` | 修改当前用户密码 |
 | GET | `/api/tickets` | 工单列表（分页 + 筛选 + 排序） |
 | POST | `/api/tickets` | 创建工单，报告人取会话身份 |
 | GET | `/api/tickets/:id` | 工单详情 |
@@ -140,6 +151,10 @@ schema_migrations version, name, applied_at
 | DELETE | `/api/tickets/:id` | 删除工单（仅管理员） |
 | GET | `/api/tickets/:id/comments` | 评论列表 |
 | POST | `/api/tickets/:id/comments` | 新增评论 |
+| GET | `/api/tickets/:id/activities` | 操作记录（活动流） |
+| POST | `/api/tickets/bulk` | 批量改状态 / 优先级 / 经办人 |
+| GET | `/api/tickets/export` | 按筛选条件导出 CSV |
+| POST | `/api/tickets/import` | CSV 批量导入，支持试跑 |
 | GET | `/api/tags` | 标签列表 |
 | GET | `/api/stats/overview` | 统计概览 |
 
@@ -155,7 +170,7 @@ docker run -p 3000:3000 -v teamdesk-data:/app/data teamdesk
 
 ## 开发里程碑
 
-仓库的提交历史按真实开发顺序组织，对应以下 7 个里程碑：
+仓库的提交历史按真实开发顺序组织，对应以下 10 个里程碑：
 
 1. **工程初始化** — 脚手架、TypeScript、ESLint / Prettier、提交规范、CI 骨架
 2. **领域模型与数据层** — 实体与状态机、版本化迁移、Repository、种子数据
@@ -164,6 +179,11 @@ docker run -p 3000:3000 -v teamdesk-data:/app/data teamdesk
 5. **用户体系与鉴权** — 会话令牌、登录注册、接口鉴权与资源归属
 6. **业务增强** — 看板视图、排序检索、统计看板
 7. **质量与交付** — 测试补全、CI 加固、敏感信息自查、Docker 与文档
+8. **活动流与批量操作** — 操作留痕、活动流接口、列表多选与批量更新
+9. **导入导出与账号设置** — CSV 导出与解析、批量导入与试跑校验、修改密码与个人设置
+10. **SLA 与工作台** — 按优先级的响应时限、列表与详情的超时标记、登录后工作台首页
+
+每个里程碑对应的提交区间见 [docs/MILESTONES.md](./docs/MILESTONES.md)。
 
 ## 安全说明
 
