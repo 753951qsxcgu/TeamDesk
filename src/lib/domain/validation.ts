@@ -9,8 +9,9 @@ const optionalId = z.string().min(1).max(64).nullable().optional();
 
 export const createTicketSchema = z.object({
   title: z.string().trim().min(1, "标题不能为空").max(120, "标题不能超过 120 个字"),
-  description: z.string().trim().max(5000, "描述不能超过 5000 个字").optional().default(""),
-  priority: z.enum(TICKET_PRIORITIES).optional().default("medium"),
+  // 用 default 而非 optional：输入可缺省，但校验后的输出一定是有值的
+  description: z.string().trim().max(5000, "描述不能超过 5000 个字").default(""),
+  priority: z.enum(TICKET_PRIORITIES).default("medium"),
   assigneeId: optionalId,
   // 鉴权接入前由调用方显式传入，接入后改为从会话填充（见 M5）
   reporterId: z.string().min(1).max(64),

@@ -5,7 +5,7 @@ import { AppError } from "@/lib/domain/errors";
  * 入参校验入口：zod 失败统一转成 VALIDATION_ERROR，
  * 并把字段级错误放进 details，方便前端直接定位到表单项。
  */
-export function parseOrThrow<T>(schema: z.ZodType<T>, input: unknown): T {
+export function parseOrThrow<S extends z.ZodTypeAny>(schema: S, input: unknown): z.output<S> {
   const result = schema.safeParse(input);
   if (!result.success) {
     throw AppError.validation("参数校验失败", result.error.flatten());
