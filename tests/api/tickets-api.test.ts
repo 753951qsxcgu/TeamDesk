@@ -1,6 +1,10 @@
 import { NextRequest } from "next/server";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { authState } from "../helpers/auth-mock";
 import { jsonRequest, setupApi, type ApiHarness } from "../helpers/api";
+
+// 用可切换的登录态替身替换真实的 Cookie 读取
+vi.mock("@/lib/auth/current-user", async () => await import("../helpers/auth-mock"));
 
 const BASE = "http://localhost:3000/api";
 
@@ -10,13 +14,13 @@ beforeAll(async () => {
   harness = await setupApi();
 });
 
+beforeEach(() => {
+  authState.currentUser = harness.admin;
+});
+
 async function createTicket(title: string, extra: Record<string, unknown> = {}) {
   const response = await harness.routes.list.POST(
-    jsonRequest(`${BASE}/tickets`, "POST", {
-      title,
-      reporterId: harness.admin.id,
-      ...extra,
-    }),
+    jsonRequest(`${BASE}/tickets`, "POST", { title, ...extra }),
   );
   return (await response.json()) as {
     ok: boolean;
@@ -85,11 +89,11 @@ describe("POST /api/tickets", () => {
     expect(JSON.stringify(body.error?.details)).toContain("标题不能为空");
   });
 
-  it("报告人不存在返回 400", async () => {
-    const body = await createTicket("报告人不存在的工单", { reporterId: "no-such-user" });
+  it("经办人不存在返回 400", async () => {
+    const body = await createTicket("经办人不存在的工单", { assigneeId: "no-such-user" });
 
     expect(body.ok).toBe(false);
-    expect(body.error?.message).toContain("报告人不存在");
+    expect(body.error?.message).toContain("经办人不存在");
   });
 
   it("请求体不是 JSON 时返回 400", async () => {
@@ -225,6 +229,62 @@ describe("DELETE /api/tickets/:id", () => {
       params,
     });
     expect(response.status).toBe(404);
+  });
+});
+
+describe("登录态与权限", () => {
+  it("未登录访问列表返回 401", async () => {
+    authState.currentUser = null;
+
+    const response = await harness.routes.list.GET(new NextRequest(`${BASE}/tickets`));
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body.error.code).toBe("UNAUTHORIZED");
+  });
+
+  it("创建工单的报告人取会话身份，不信任请求体", async () => {
+    authState.currentUser = harness.member;
+
+    const body = await createTicket("成员创建的工单", { reporterId: "someone-else" });
+    const id = body.data!.id;
+
+    const detail = await harness.routes.detail.GET(new NextRequest(`${BASE}/tickets/${id}`), {
+      params: Promise.resolve({ id }),
+    });
+    const detailBody = await detail.json();
+
+    expect(detailBody.data.reporter.id).toBe(harness.member.id);
+  });
+
+  it("非管理员删除工单返回 403", async () => {
+    const created = await createTicket("成员尝试删除的工单");
+    const id = created.data!.id;
+    authState.currentUser = harness.member;
+
+    const response = await harness.routes.detail.DELETE(
+      new NextRequest(`${BASE}/tickets/${id}`, { method: "DELETE" }),
+      { params: Promise.resolve({ id }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error.code).toBe("FORBIDDEN");
+  });
+
+  it("既不是报告人也不是经办人的成员不能改工单", async () => {
+    const created = await createTicket("别人的工单");
+    const id = created.data!.id;
+    const outsider = harness.member;
+    authState.currentUser = outsider;
+
+    const response = await harness.routes.detail.PATCH(
+      jsonRequest(`${BASE}/tickets/${id}`, "PATCH", { title: "越权修改" }),
+      { params: Promise.resolve({ id }) },
+    );
+    // outsider 是成员角色，且不是这条工单的报告人或经办人
+    expect(outsider.role).toBe("member");
+    expect(response.status).toBe(403);
   });
 });
 

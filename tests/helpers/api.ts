@@ -3,11 +3,11 @@
  * 保证 TEAMDESK_DB_PATH 在 getDb() 首次调用之前生效。
  */
 import { NextRequest } from "next/server";
-import type { TagRecord, UserRecord } from "@/lib/domain/types";
+import type { PublicUser, TagRecord } from "@/lib/domain/types";
 
 export interface ApiHarness {
-  admin: UserRecord;
-  member: UserRecord;
+  admin: PublicUser;
+  member: PublicUser;
   tag: TagRecord;
   routes: {
     list: typeof import("@/app/api/tickets/route");
@@ -25,16 +25,16 @@ export async function setupApi(): Promise<ApiHarness> {
   const { createServices } = await import("@/lib/services/container");
   const services = createServices(getDb());
 
-  const admin = services.users.create({
+  const admin = services.users.register({
     email: "admin@teamdesk.test",
     name: "管理员",
-    passwordHash: "scrypt$00$00",
+    password: "teamdesk-admin",
     role: "admin",
   });
-  const member = services.users.create({
+  const member = services.users.register({
     email: "member@teamdesk.test",
     name: "成员",
-    passwordHash: "scrypt$00$00",
+    password: "teamdesk-member",
   });
   const tag = services.tags.create("登录", "#2563eb");
 
