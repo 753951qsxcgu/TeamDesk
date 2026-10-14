@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ActivityTimeline } from "@/components/tickets/activity-timeline";
 import { CommentPanel } from "@/components/tickets/comment-panel";
 import { PriorityBadge, StatusBadge } from "@/components/tickets/badges";
 import { TicketActions } from "@/components/tickets/ticket-actions";
@@ -21,9 +22,11 @@ export default async function TicketDetailPage({ params }: PageProps) {
 
   let ticket;
   let comments;
+  let activities;
   try {
     ticket = services.tickets.get(id);
     comments = services.tickets.listComments(id);
+    activities = services.tickets.listActivities(id);
   } catch (error) {
     if (error instanceof AppError && error.code === "NOT_FOUND") {
       notFound();
@@ -108,6 +111,13 @@ export default async function TicketDetailPage({ params }: PageProps) {
               nextStatuses={nextStatuses}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader title="操作记录" description="状态、优先级、经办人的变化都会留痕" />
+        <CardContent>
+          <ActivityTimeline activities={activities} />
         </CardContent>
       </Card>
 
