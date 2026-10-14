@@ -18,6 +18,9 @@ export interface CreateTicketInput {
   status?: TicketStatus;
   reporterId: string;
   assigneeId?: string | null;
+  /** 仅种子数据使用：显式指定创建/更新时间，便于造出有趋势的演示数据 */
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface UpdateTicketInput {
@@ -64,6 +67,8 @@ export class TicketRepository {
 
   create(input: CreateTicketInput): TicketRecord {
     const now = new Date().toISOString();
+    const createdAt = input.createdAt ?? now;
+    const updatedAt = input.updatedAt ?? createdAt;
     const record: TicketRecord = {
       id: randomUUID(),
       title: input.title.trim(),
@@ -72,8 +77,8 @@ export class TicketRepository {
       priority: input.priority ?? "medium",
       reporterId: input.reporterId,
       assigneeId: input.assigneeId ?? null,
-      createdAt: now,
-      updatedAt: now,
+      createdAt,
+      updatedAt,
       resolvedAt: null,
       closedAt: null,
     };

@@ -41,10 +41,12 @@ export function timestampsForTransition(
   now: string,
 ): Partial<Record<"resolvedAt" | "closedAt", string | null>> {
   const patch: Partial<Record<"resolvedAt" | "closedAt", string | null>> = {};
+  // 进入 resolved 时打点；退回处理中/待处理时清空，避免统计到脏的解决时间
   if (to === "resolved") patch.resolvedAt = now;
-  if (from === "resolved" && to !== "resolved") patch.resolvedAt = null;
+  if ((to === "open" || to === "in_progress") && from === "resolved") patch.resolvedAt = null;
+  // 进入 closed 时打点；重开时清空。resolved → closed 保留已解决时间
   if (to === "closed") patch.closedAt = now;
-  if (from === "closed" && to !== "closed") patch.closedAt = null;
+  if (to !== "closed" && from === "closed") patch.closedAt = null;
   return patch;
 }
 

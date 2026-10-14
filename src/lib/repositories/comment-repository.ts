@@ -7,6 +7,8 @@ export interface CreateCommentInput {
   ticketId: string;
   authorId: string;
   body: string;
+  /** 仅种子数据使用：显式指定创建时间 */
+  createdAt?: string;
 }
 
 export interface CommentWithAuthor extends CommentRecord {
@@ -22,7 +24,7 @@ export class CommentRepository {
       ticketId: input.ticketId,
       authorId: input.authorId,
       body: input.body.trim(),
-      createdAt: new Date().toISOString(),
+      createdAt: input.createdAt ?? new Date().toISOString(),
     };
     this.db
       .prepare(
