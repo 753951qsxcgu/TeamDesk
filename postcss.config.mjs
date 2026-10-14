@@ -1,8 +1,7 @@
+/** Next.js 读取的 PostCSS 配置：必须直接导出 plugins */
 const config = {
-  postcss: {
-    plugins: {
-      "@tailwindcss/postcss": {},
-    },
+  plugins: {
+    "@tailwindcss/postcss": {},
   },
 };
 

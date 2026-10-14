@@ -1,14 +1,26 @@
+import { FlatCompat } from "@eslint/eslintrc";
 import js from "@eslint/js";
 import prettier from "eslint-config-prettier";
 import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
+// next/core-web-vitals 仍是 eslintrc 风格配置，用 FlatCompat 桥接到 flat config
+const compat = new FlatCompat({ baseDirectory: process.cwd() });
+
 export default tseslint.config(
   {
-    ignores: [".next/**", "node_modules/**", "coverage/**", "data/**", "*.config.js"],
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "coverage/**",
+      "data/**",
+      // Next.js 自动生成的类型声明，不参与检查
+      "next-env.d.ts",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  ...compat.extends("next/core-web-vitals"),
   {
     files: ["**/*.{ts,tsx}"],
     plugins: { "react-hooks": reactHooks },

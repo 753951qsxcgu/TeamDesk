@@ -2,6 +2,7 @@
  * 筛选表单：直接用原生 GET 表单提交，把条件写进查询串，
  * 不需要额外的客户端 JS，也能被服务端组件直接读到。
  */
+import Link from "next/link";
 import type { PublicUser, TagRecord } from "@/lib/domain/types";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/domain/ticket-status";
 import { TICKET_PRIORITIES, TICKET_STATUSES } from "@/lib/domain/types";
@@ -94,12 +95,12 @@ export function TicketFilters({ defaultValues, users, tags }: TicketFiltersProps
       >
         筛选
       </button>
-      <a
+      <Link
         href="/tickets"
         className="h-9 rounded-md bg-white px-4 text-sm leading-9 text-slate-600 ring-1 ring-slate-300 hover:bg-slate-50"
       >
         重置
-      </a>
+      </Link>
     </form>
   );
 }
