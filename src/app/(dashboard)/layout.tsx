@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 
 const NAV_ITEMS = [
   { href: "/tickets", label: "工单列表" },
+  { href: "/board", label: "看板" },
   { href: "/tickets/new", label: "新建工单" },
 ];
 
