@@ -10,9 +10,11 @@ import type {
   TicketDetail,
   TicketQuery,
   TicketRecord,
+  TicketActivityWithActor,
   UserRole,
 } from "@/lib/domain/types";
 import type { CreateCommentPayload, CreateTicketPayload, UpdateTicketPayload, TransitionPayload } from "@/lib/domain/validation";
+import type { ActivityRepository } from "@/lib/repositories/activity-repository";
 import type { CommentRepository, CommentWithAuthor } from "@/lib/repositories/comment-repository";
 import type { TagRepository } from "@/lib/repositories/tag-repository";
 import type { TicketRepository } from "@/lib/repositories/ticket-repository";
@@ -33,6 +35,7 @@ export interface TicketServiceDeps {
   comments: CommentRepository;
   tags: TagRepository;
   users: UserLookup;
+  activities: ActivityRepository;
 }
 
 export class TicketService {
@@ -63,6 +66,12 @@ export class TicketService {
     if (payload.tagIds?.length) {
       this.applyTags(ticket.id, payload.tagIds);
     }
+    this.deps.activities.create({
+      ticketId: ticket.id,
+      actorId: reporterId,
+      type: "created",
+      toValue: ticket.title,
+    });
     return this.get(ticket.id);
   }
 
@@ -80,6 +89,7 @@ export class TicketService {
     if (tagIds) {
       this.applyTags(id, tagIds);
     }
+    this.recordFieldChanges(ticket, fields, actor);
     return this.get(id);
   }
 
@@ -93,12 +103,25 @@ export class TicketService {
       status: payload.to,
       ...timestampsForTransition(ticket.status, payload.to, now),
     });
+    this.deps.activities.create({
+      ticketId: id,
+      actorId: actorId ?? ticket.reporterId,
+      type: "status_changed",
+      fromValue: ticket.status,
+      toValue: payload.to,
+    });
 
     if (payload.comment?.trim()) {
       this.deps.comments.create({
         ticketId: id,
         authorId: actorId ?? ticket.reporterId,
         body: payload.comment.trim(),
+      });
+      this.deps.activities.create({
+        ticketId: id,
+        actorId: actorId ?? ticket.reporterId,
+        type: "commented",
+        note: payload.comment.trim().slice(0, 120),
       });
     }
 
@@ -129,8 +152,53 @@ export class TicketService {
       body: payload.body,
     });
     const author = this.deps.users.findById(authorId);
+    this.deps.activities.create({
+      ticketId,
+      actorId: authorId,
+      type: "commented",
+      note: payload.body.slice(0, 120),
+    });
 
     return { ...comment, author };
+  }
+
+  listActivities(ticketId: string, limit = 50): TicketActivityWithActor[] {
+    this.requireTicket(ticketId);
+    return this.deps.activities.listByTicket(ticketId, limit);
+  }
+
+  /** 记录优先级与经办人的变化；标题/描述这类改动只记一条 updated */
+  private recordFieldChanges(
+    before: TicketRecord,
+    fields: Omit<UpdateTicketPayload, "tagIds">,
+    actor: Actor,
+  ): void {
+    if (fields.priority !== undefined && fields.priority !== before.priority) {
+      this.deps.activities.create({
+        ticketId: before.id,
+        actorId: actor.id,
+        type: "priority_changed",
+        fromValue: before.priority,
+        toValue: fields.priority,
+      });
+    }
+    if (fields.assigneeId !== undefined && fields.assigneeId !== before.assigneeId) {
+      this.deps.activities.create({
+        ticketId: before.id,
+        actorId: actor.id,
+        type: "assignee_changed",
+        fromValue: before.assigneeId ?? "未指派",
+        toValue: fields.assigneeId ?? "未指派",
+      });
+    }
+    if (fields.title !== undefined || fields.description !== undefined) {
+      this.deps.activities.create({
+        ticketId: before.id,
+        actorId: actor.id,
+        type: "updated",
+        note: "更新了工单内容",
+      });
+    }
   }
 
   private requireTicket(id: string): TicketRecord {

@@ -1,4 +1,5 @@
 import { getDb, type Db } from "@/lib/db/connection";
+import { ActivityRepository } from "@/lib/repositories/activity-repository";
 import { CommentRepository } from "@/lib/repositories/comment-repository";
 import { StatsRepository } from "@/lib/repositories/stats-repository";
 import { TagRepository } from "@/lib/repositories/tag-repository";
@@ -20,10 +21,11 @@ export function createServices(db: Db): Services {
   const users = new UserService(new UserRepository(db));
   const tags = new TagRepository(db);
   const comments = new CommentRepository(db);
+  const activities = new ActivityRepository(db);
   const tickets = new TicketRepository(db);
 
   return {
-    tickets: new TicketService({ tickets, comments, tags, users }),
+    tickets: new TicketService({ tickets, comments, tags, users, activities }),
     tags: new TagService(tags),
     users,
     stats: new StatsService(new StatsRepository(db)),
