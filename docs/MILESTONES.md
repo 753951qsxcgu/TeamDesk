@@ -98,7 +98,7 @@
 - **标题**：质量与交付：测试补全、CI 加固、敏感信息自查、Docker 与文档
 - **说明**：
   CI 从「只跑类型检查与 lint」扩展为三个 job：quality（typecheck + lint +
-  敏感信息自查）、test（M7 收尾时为 66 个用例，现已增至 98 个）、build（生产构建后跑 db:migrate 与 db:seed
+  敏感信息自查）、test（M7 收尾时为 66 个用例，现已增至 103 个）、build（生产构建后跑 db:migrate 与 db:seed
   冒烟，确认干净环境可用）。新增 scripts/check-secrets.ts 做提交前敏感信息粗筛，
   命中 API Key、AWS Key、GitHub Token、私钥头、带密码连接串、硬编码口令即非零
   退出，并串进 npm run verify。补上架构说明与接口文档两篇文档，说明分层职责、六条
@@ -160,7 +160,7 @@
 - [x] 无密钥 / 令牌 / 真实客户数据 / 内部地址：`.env.example` 仅占位，数据库文件与日志已被 .gitignore 排除
 - [x] `npm run typecheck` 通过
 - [x] `npm run lint` 通过（0 error）
-- [x] `npm test` 通过（12 个测试文件 / 98 个用例）
+- [x] `npm test` 通过（13 个测试文件 / 103 个用例）
 - [x] `npm run build` 通过（27 条路由）
 - [x] `npm run db:migrate` 与 `npm run db:seed` 在干净库上可跑通且幂等
 - [ ] 推送 GitHub 前再跑一次 `npm run check:secrets`

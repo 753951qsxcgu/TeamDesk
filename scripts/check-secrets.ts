@@ -7,29 +7,25 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { scanContent, type SecretFinding } from "./lib/secret-rules";
 
-interface Rule {
-  name: string;
-  pattern: RegExp;
-}
-
-const RULES: Rule[] = [
-  { name: "OpenAI / 通用 API Key", pattern: /sk-[A-Za-z0-9]{20,}/ },
-  { name: "AWS Access Key", pattern: /AKIA[0-9A-Z]{16}/ },
-  { name: "GitHub Token", pattern: /gh[pousr]_[A-Za-z0-9]{20,}/ },
-  { name: "私钥文件头", pattern: /-----BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/ },
-  { name: "Slack Token", pattern: /xox[baprs]-[A-Za-z0-9-]{10,}/ },
-  { name: "数据库连接串含密码", pattern: /(postgres|mysql|mongodb):\/\/[^:\s]+:[^@\s]+@/ },
-  { name: "硬编码口令赋值", pattern: /(password|passwd|secret|token)\s*[:=]\s*["'][^"'\s]{8,}["']/i },
-];
-
-const SKIP_DIRECTORIES = new Set(["node_modules", ".next", ".git", "data", "coverage", ".workbuddy"]);
+const SKIP_DIRECTORIES = new Set([
+  "node_modules",
+  ".next",
+  ".git",
+  "data",
+  "coverage",
+  ".workbuddy",
+]);
 
 const ALLOWLIST_FILES = [
   // 占位配置与规则自身的样例
   ".env.example",
   "scripts/check-secrets.ts",
+  "scripts/lib/",
   "docs/",
+  // 测试夹具刻意构造各类样例（含伪造的密钥样式），不参与自查
+  "tests/",
 ];
 
 /**
@@ -58,7 +54,7 @@ function main(): void {
   const root = process.cwd();
   const files = collectFiles(root).filter((file) => file !== "package-lock.json");
 
-  const findings: { file: string; line: number; rule: string; snippet: string }[] = [];
+  const findings: (SecretFinding & { file: string })[] = [];
 
   for (const file of files) {
     if (ALLOWLIST_FILES.some((allowed) => file.startsWith(allowed))) continue;
@@ -70,18 +66,9 @@ function main(): void {
       continue;
     }
 
-    content.split("\n").forEach((line, index) => {
-      for (const rule of RULES) {
-        if (rule.pattern.test(line)) {
-          findings.push({
-            file,
-            line: index + 1,
-            rule: rule.name,
-            snippet: line.trim().slice(0, 120),
-          });
-        }
-      }
-    });
+    for (const finding of scanContent(content)) {
+      findings.push({ ...finding, file });
+    }
   }
 
   if (findings.length === 0) {

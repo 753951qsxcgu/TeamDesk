@@ -15,9 +15,7 @@ describe("toCsv", () => {
   });
 
   it("逗号、引号与换行都按 RFC 4180 转义", () => {
-    const csv = body(
-      toCsv(["内容"], [["a,b"], ['say "hi"'], ["line1\nline2"]]),
-    );
+    const csv = body(toCsv(["内容"], [["a,b"], ['say "hi"'], ["line1\nline2"]]));
 
     expect(csv).toBe('内容\r\n"a,b"\r\n"say ""hi"""\r\n"line1\nline2"');
   });

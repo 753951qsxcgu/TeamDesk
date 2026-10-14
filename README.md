@@ -91,7 +91,7 @@ npm run dev          # http://localhost:3000
 本地验证一条命令跑完：
 
 ```bash
-npm run verify       # 类型检查 + lint + 敏感信息自查 + 98 个测试
+npm run verify       # 类型检查 + lint + 敏感信息自查 + 103 个测试
 ```
 
 种子数据创建的默认账号：
@@ -111,7 +111,7 @@ npm run verify       # 类型检查 + lint + 敏感信息自查 + 98 个测试
 | `npm run build` / `npm start` | 生产构建与启动 |
 | `npm run typecheck` | TypeScript 全量类型检查 |
 | `npm run lint` | ESLint |
-| `npm test` | 运行全部测试（98 个用例） |
+| `npm test` | 运行全部测试（103 个用例） |
 | `npm run check:secrets` | 敏感信息自查 |
 | `npm run verify` | 类型检查 + lint + 自查 + 测试，提交前跑一遍 |
 | `npm run db:migrate` | 执行数据库迁移 |
