@@ -86,7 +86,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
             </Link>
           }
         />
-        <TicketTable tickets={result.items} />
+        <TicketTable tickets={result.items} users={users} />
         <Pagination
           page={result.page}
           pageSize={result.pageSize}
